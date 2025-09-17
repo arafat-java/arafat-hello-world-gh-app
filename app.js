@@ -1,6 +1,3 @@
-// These are the dependencies for this file.
-//
-// You installed the `dotenv` and `octokit` modules earlier. The `@octokit/webhooks` is a dependency of the `octokit` module, so you don't need to install it separately. The `fs` and `http` dependencies are built-in Node.js modules.
 import dotenv from "dotenv";
 import {App} from "octokit";
 import {createNodeMiddleware} from "@octokit/webhooks";
@@ -14,6 +11,9 @@ dotenv.config();
 const appId = process.env.APP_ID;
 const webhookSecret = process.env.WEBHOOK_SECRET;
 const privateKeyPath = process.env.PRIVATE_KEY_PATH;
+
+console.log(appId, webhookSecret, privateKeyPath);
+console.log(process.env.APP_ID, process.env.WEBHOOK_SECRET, process.env.PRIVATE_KEY_PATH);
 
 // This reads the contents of your private key file.
 const privateKey = fs.readFileSync(privateKeyPath, "utf8");
@@ -81,8 +81,42 @@ const localWebhookUrl = `http://${host}:${port}${path}`;
 //    - Trigger the corresponding webhook event handler.
 const middleware = createNodeMiddleware(app.webhooks, {path});
 
+// Add logging middleware to track all incoming requests
+const loggingMiddleware = (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Server invoked!`);
+  
+  // Log the payload for POST requests
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      console.log('POST Request Payload:');
+      try {
+        // Try to parse and pretty-print JSON
+        const jsonPayload = JSON.parse(body);
+        console.log(JSON.stringify(jsonPayload, null, 2));
+      } catch (error) {
+        // If not valid JSON, print as plain text
+        console.log(body);
+      }
+      console.log('POST Request Headers:');
+      console.log(JSON.stringify(req.headers, null, 2));
+    });
+  }
+  
+  next();
+};
+
 // This creates a Node.js server that listens for incoming HTTP requests (including webhook payloads from GitHub) on the specified port. When the server receives a request, it executes the `middleware` function that you defined earlier. Once the server is running, it logs messages to the console to indicate that it is listening.
-http.createServer(middleware).listen(port, () => {
+http.createServer((req, res) => {
+  // Apply logging middleware first
+  loggingMiddleware(req, res, () => {
+    // Then apply the webhook middleware
+    middleware(req, res);
+  });
+}).listen(port, () => {
   console.log(`Server is listening for events at: ${localWebhookUrl}`);
   console.log('Press Ctrl + C to quit.')
 });
