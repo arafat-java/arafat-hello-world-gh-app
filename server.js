@@ -6,25 +6,16 @@ import {port, host, path, localWebhookUrl} from "./config.js";
 export const loggingMiddleware = (req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Server invoked!`);
   
-  // Log the payload for POST requests
+  // Log headers for POST requests (without consuming the body)
   if (req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      console.log('POST Request Payload:');
-      try {
-        // Try to parse and pretty-print JSON
-        const jsonPayload = JSON.parse(body);
-        console.log(JSON.stringify(jsonPayload, null, 2));
-      } catch (error) {
-        // If not valid JSON, print as plain text
-        console.log(body);
-      }
-      console.log('POST Request Headers:');
-      console.log(JSON.stringify(req.headers, null, 2));
-    });
+    console.log('POST Request Headers:');
+    console.log(JSON.stringify(req.headers, null, 2));
+    
+    // Log the GitHub event type if it's a webhook
+    const githubEvent = req.headers['x-github-event'];
+    if (githubEvent) {
+      console.log(`GitHub Event Type: ${githubEvent}`);
+    }
   }
   
   next();
